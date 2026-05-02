@@ -1,0 +1,250 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import Button from "@/components/Slice/UI/Button";
+
+type CampaignFormState = {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  receiptNumber: string;
+  shopLocation: string;
+};
+
+const initialFormState: CampaignFormState = {
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  receiptNumber: "",
+  shopLocation: "",
+};
+
+export default function CampaignPage() {
+  const [form, setForm] = useState<CampaignFormState>(initialFormState);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+
+  function handleChange(
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) {
+    const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setIsSubmitted(false);
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitted(true);
+  }
+
+  function handleReceiptUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setReceiptPreview(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReceiptPreview(typeof reader.result === "string" ? reader.result : null);
+    };
+    reader.readAsDataURL(file);
+    setIsSubmitted(false);
+  }
+
+  return (
+    <section className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <div className="mx-auto grid w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-200 lg:grid-cols-2">
+        <div className="bg-slate-900 p-6 text-white sm:p-10 lg:p-12">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+            Join Our Campaign
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl lg:text-4xl">
+            Be part of the next big movement
+          </h1>
+          <p className="mt-4 max-w-md text-sm text-slate-200 sm:text-base">
+            Submit your details and our team will reach out with updates,
+            volunteering opportunities, and campaign activities in your area.
+          </p>
+          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-white/10 p-4">
+              <p className="text-xs text-slate-300">Fast Registration</p>
+              <p className="mt-1 text-sm font-medium">Less than 1 minute</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-4">
+              <p className="text-xs text-slate-300">Secure Details</p>
+              <p className="mt-1 text-sm font-medium">Your data stays private</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-10 lg:p-12">
+          <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+            Spin the Wheel contest
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Fill in your details to participate in the contest.
+          </p>
+
+          <form className="mt-6 space-y-4 sm:mt-8 sm:space-y-5" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="name" className="text-sm font-medium text-slate-700">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Enter your name"
+                  required
+                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="email" className="text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="Enter your email"
+                  required
+                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="phone" className="text-sm font-medium text-slate-700">
+                  Phone
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder="Enter your phone number"
+                  required
+                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="address" className="text-sm font-medium text-slate-700">
+                  Address
+                </label>
+                <input
+                  id="address"
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  placeholder="Enter your address"
+                  required
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="receiptNumber"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Receipt Number
+                </label>
+                <input
+                  id="receiptNumber"
+                  name="receiptNumber"
+                  type="text"
+                  value={form.receiptNumber}
+                  onChange={handleChange}
+                  placeholder="Enter receipt number"
+                  required
+                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="shopLocation"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Shop Location
+                </label>
+                <input
+                  id="shopLocation"
+                  name="shopLocation"
+                  type="text"
+                  value={form.shopLocation}
+                  onChange={handleChange}
+                  placeholder="Enter shop location"
+                  required
+                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="receiptImage" className="text-sm font-medium text-slate-700">
+                Upload Receipt
+              </label>
+              <input
+                id="receiptImage"
+                name="receiptImage"
+                type="file"
+                accept="image/*"
+                onChange={handleReceiptUpload}
+                required
+                className="block w-full cursor-pointer rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:cursor-pointer file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-white hover:file:bg-slate-700"
+              />
+              {receiptPreview ? (
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Receipt Preview
+                  </p>
+                  <Image
+                    src={receiptPreview}
+                    alt="Uploaded receipt preview"
+                    width={800}
+                    height={600}
+                    unoptimized
+                    className="max-h-64 w-full rounded-md object-contain"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500 sm:max-w-xs">
+                We only use your details for campaign communication.
+              </p>
+              <Button type="submit" className="h-11 w-full px-6 sm:w-auto">
+                Submit
+              </Button>
+            </div>
+
+            {isSubmitted ? (
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                Thank you! Your form has been submitted.
+              </p>
+            ) : null}
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -1,0 +1,1704 @@
+{
+  "info": {
+    "name": "Spin Platform API",
+    "description": "Spin Platform API — NestJS + MySQL. **Setup:** `baseUrl` (default `http://localhost:3000`), then **Auth → Login** → `accessToken`.\n\n**Envelope:** `{ error, message, statusCode, responseData }` (see **Health** for public shape). **Exception:** **Public — QR resolve** returns **302** with `Location` (not the usual JSON envelope).\n\n**API index (example bodies live in each request’s Body / URL):**\n- **Health:** `GET /`\n- **Auth:** `POST /auth/register`, `POST /auth/login`\n- **RBAC:** `GET /rbac/me`, `GET/POST /rbac/permissions`, `DELETE /rbac/permissions/:id`, `GET/POST/PATCH /rbac/roles`, `POST /rbac/roles/:roleId/permissions`, `POST/DELETE /rbac/users/:userId/roles`\n- **Campaigns:** `GET /campaigns` (optional `?page&limit&search&status`), `POST /campaigns`, `PATCH /campaigns/:id`, `POST /campaigns/:id/products`\n- **Products:** `GET /products` (`?search=`), `POST /products`, `GET/PATCH/DELETE /products/:id`\n- **Admin — Prize config:** `GET/POST /admin/prizes`, `GET /admin/prize-config/:campaignId`, `POST /admin/prize-config`\n- **Admin — Probability:** `GET /admin/probability-config/:campaignId`, `POST /admin/probability-config`\n- **Admin — QR frontend settings:** `GET/PUT /admin/qr-frontend-settings` — persisted **`frontendBaseUrl`** (not env); `PUT` refreshes every mapping’s **`redirectUrl`**\n- **Admin — QR mappings:** `GET/POST/PATCH/DELETE /admin/qr-mappings` — `redirectUrl` uses saved frontend base + `/campaign?qr={code}` (fallback `http://localhost:3000` when unset)\n- **Campaign landing (public):** `GET /campaign?qr=:code`\n- **Lead submission (public):** `GET /leads/gifts?qrCode=:code`, `POST /leads/submit` (multipart)\n- **Leads (auth):** `GET /leads` (`?page&limit&search&campaignId`)\n- **Receipt (auth):** `POST /receipt/upload` (multipart)\n- **Spin (public):** `POST /spin`\n- **Public — QR resolve:** `GET /qr/:code` → **302** to stored `redirectUrl` (throttled)\n\n**Variables:** `accessToken`, `campaignId`, `productId`, `productId1`, `productId2`, `prizeId`, `prizeId2`, `roleId`, `targetUserId`, `permissionId`, `qrMappingId`, `qrCode`, `participationId`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "roleId", "value": "", "description": "Numeric id from GET /rbac/roles" },
+    { "key": "targetUserId", "value": "", "description": "Numeric user id from POST /auth/register or seed (admin = 1)" },
+    { "key": "permissionId", "value": "", "description": "Numeric permission id from POST /rbac/permissions or GET /rbac/permissions" },
+    { "key": "campaignId", "value": "", "description": "Numeric campaign id from POST /campaigns (test script) or GET /campaigns" },
+    { "key": "productId", "value": "1", "description": "Product id for GET/PATCH/DELETE — set by Create product or List products script" },
+    { "key": "productId1", "value": "1", "description": "First product id — updated by List products / Create product scripts" },
+    { "key": "productId2", "value": "2", "description": "Second product id — from List products script" },
+    { "key": "prizeId", "value": "1", "description": "First prize id — Create prize (Gold) or List prizes script" },
+    { "key": "prizeId2", "value": "2", "description": "Second prize id — Create prize (Silver) or List prizes script" },
+    { "key": "qrMappingId", "value": "", "description": "From List QR mappings or Create QR mapping" },
+    { "key": "qrCode", "value": "", "description": "QR code string for GET /qr/:code" },
+    { "key": "participationId", "value": "", "description": "Numeric participation id from POST /leads/submit responseData.participationId" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/",
+            "description": "Public. Example: `{ error: false, message: \"Spin Platform API is running\", statusCode: 200, responseData: { status: \"ok\" } }`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd && rd.id) {",
+                  "    pm.collectionVariables.set('targetUserId', String(rd.id));",
+                  "    console.log('Set targetUserId to new user:', rd.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"player@example.com\",\n  \"password\": \"SecurePass1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Public. Body: `email`, `password` (min 8). Response: `responseData: { id, email }`, `message`: e.g. Registration successful. Test script reads `responseData.id` → `targetUserId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Register (example — second user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd && rd.id) {",
+                  "    pm.collectionVariables.set('targetUserId', String(rd.id));",
+                  "    console.log('Set targetUserId (player2):', rd.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"player2@example.com\",\n  \"password\": \"SecurePass1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Alternate example payload. Change `email` if already registered (`409`). Overwrites `targetUserId` on success."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const token = body.responseData && body.responseData.accessToken;",
+                  "  if (token) {",
+                  "    pm.collectionVariables.set('accessToken', token);",
+                  "    console.log('Saved accessToken from responseData');",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"ChangeMe!123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Public. Example body: `email`, `password`. Response: `{ error, message, statusCode, responseData: { accessToken, admin } }`. Test script saves `responseData.accessToken` to `accessToken`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "RBAC",
+      "description": "Requires `Authorization: Bearer {{accessToken}}`. Admin routes need `rbac:manage` (seeded **admin** user).",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Current user + permissions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/rbac/me",
+            "description": "JWT only. `responseData`: `{ user: { id, email }, permissions: string[] }` (RBAC routes use default `message: Success`)."
+          },
+          "response": []
+        },
+        {
+          "name": "List permissions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/rbac/permissions",
+            "description": "Requires `rbac:manage`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create permission",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd && rd.id != null) {",
+                  "    pm.collectionVariables.set('permissionId', String(rd.id));",
+                  "    console.log('Set permissionId:', rd.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissionKey\": \"campaign:archive\",\n  \"description\": \"Archive campaigns (example)\"\n}"
+            },
+            "url": "{{baseUrl}}/rbac/permissions",
+            "description": "Requires `rbac:manage`. Body: `permissionKey` (`resource:action`, stored lowercased), optional `description`. Change `permissionKey` if you already created this one (409 duplicate). Test script saves returned `id` to `permissionId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete permission",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/rbac/permissions/{{permissionId}}",
+            "description": "Requires `rbac:manage`. Set `permissionId` (e.g. run **Create permission** first, or copy id from **List permissions**). Removes the row and cascades `role_permissions` links."
+          },
+          "response": []
+        },
+        {
+          "name": "List roles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const roles = body.responseData;",
+                  "  if (Array.isArray(roles)) {",
+                  "    const admin = roles.find((r) => r.name === 'admin');",
+                  "    if (admin && admin.id) {",
+                  "      pm.collectionVariables.set('roleId', String(admin.id));",
+                  "      console.log('Set roleId to admin role:', admin.id);",
+                  "    }",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/rbac/roles",
+            "description": "Requires `rbac:manage`. Test script sets `roleId` to the **admin** role id when present."
+          },
+          "response": []
+        },
+        {
+          "name": "Create role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"support\",\n  \"description\": \"Read-only support desk\"\n}"
+            },
+            "url": "{{baseUrl}}/rbac/roles",
+            "description": "Requires `rbac:manage`. `description` is optional."
+          },
+          "response": []
+        },
+        {
+          "name": "Update role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"support\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": "{{baseUrl}}/rbac/roles/{{roleId}}",
+            "description": "Requires `rbac:manage`. Set `roleId` (e.g. run **List roles** first). Send only fields to change."
+          },
+          "response": []
+        },
+        {
+          "name": "Set role permissions (replace)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissionKeys\": [\n    \"campaign:read\",\n    \"campaign:write\",\n    \"product:read\"\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/rbac/roles/{{roleId}}/permissions",
+            "description": "Requires `rbac:manage`. Replaces all permissions for the role with this list. Keys must exist in DB (see seed / permission-keys)."
+          },
+          "response": []
+        },
+        {
+          "name": "Assign role to user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"{{roleId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/rbac/users/{{targetUserId}}/roles",
+            "description": "Requires `rbac:manage`. Path `userId` = user id. Body `roleId` = role id (often same as collection `roleId`). Set `targetUserId` from Register response."
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke role from user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/rbac/users/{{targetUserId}}/roles/{{roleId}}",
+            "description": "Requires `rbac:manage`. Removes the role from the user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Campaigns",
+      "description": "Requires `Authorization: Bearer {{accessToken}}`. Same envelope as other APIs: `error`, `message`, `statusCode`, `responseData`.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "List campaigns",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/campaigns",
+            "description": "Returns all campaigns with nested `products` (id, name). No query params."
+          },
+          "response": []
+        },
+        {
+          "name": "List campaigns (pagination & filters)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/campaigns?page=1&limit=10&search=Summer&status=ACTIVE",
+            "description": "Optional query: `page`, `limit` (1–100), `search` (name substring), `status` = `ACTIVE` | `INACTIVE`. Omit both `page` and `limit` to list all campaigns without pagination metadata."
+          },
+          "response": []
+        },
+        {
+          "name": "Create campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const data = body && body.responseData;",
+                  "  if (data && data.id != null) {",
+                  "    pm.collectionVariables.set('campaignId', String(data.id));",
+                  "    console.log('Set campaignId:', data.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Summer Spin 2026\",\n  \"startDate\": \"2026-06-01T00:00:00.000Z\",\n  \"endDate\": \"2026-06-30T23:59:59.000Z\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/campaigns",
+            "description": "`name` must be unique; `endDate` must be after `startDate`; `status` is `ACTIVE` or `INACTIVE`. Test script saves `responseData.id` → `campaignId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create campaign (example — Winter Spin 2026)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const data = body && body.responseData;",
+                  "  if (data && data.id != null) {",
+                  "    pm.collectionVariables.set('campaignId', String(data.id));",
+                  "    console.log('Set campaignId (Winter):', data.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Winter Spin 2026\",\n  \"startDate\": \"2026-12-01T00:00:00.000Z\",\n  \"endDate\": \"2026-12-31T23:59:59.000Z\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/campaigns",
+            "description": "Alternate example payload (different `name`/dates). Overwrites `campaignId` on success. Use if **Summer Spin 2026** already exists."
+          },
+          "response": []
+        },
+        {
+          "name": "Update campaign",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Summer Spin 2026 (updated)\",\n  \"startDate\": \"2026-06-01T00:00:00.000Z\",\n  \"endDate\": \"2026-07-15T23:59:59.000Z\",\n  \"status\": \"INACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/campaigns/{{campaignId}}",
+            "description": "Full example body (all fields). Partial updates allowed — send only fields to change. Set `campaignId` (e.g. run **Create campaign** first). Validates date range when both `startDate` and `endDate` are evaluated against each other."
+          },
+          "response": []
+        },
+        {
+          "name": "Update campaign (partial — status only)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/campaigns/{{campaignId}}",
+            "description": "Example minimal PATCH: only `status` (`ACTIVE` | `INACTIVE`). Omit dates to avoid date-range validation on update."
+          },
+          "response": []
+        },
+        {
+          "name": "Map products to campaign (example payload)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productIds\": [1, 2, 3],\n  \"replaceExisting\": true\n}"
+            },
+            "url": "{{baseUrl}}/campaigns/{{campaignId}}/products",
+            "description": "`replaceExisting: true` removes existing mappings for this campaign, then adds the listed products. All `productIds` must exist. Replace `[1,2,3]` with real ids from **Products → List products**. Set `campaignId` first."
+          },
+          "response": []
+        },
+        {
+          "name": "Map products to campaign (collection product ids)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productIds\": [{{productId1}}, {{productId2}}],\n  \"replaceExisting\": false\n}"
+            },
+            "url": "{{baseUrl}}/campaigns/{{campaignId}}/products",
+            "description": "Uses `productId1` and `productId2` from collection variables (defaults 1,2 — run **List products** to refresh from DB). `replaceExisting: false` keeps existing mappings and adds new ones (duplicates ignored)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "description": "Requires `Authorization: Bearer {{accessToken}}`. Unified envelope; **Create** = `201`. **Delete** uses `responseData: null` and top-level `message`.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "List products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const products = body && body.responseData;",
+                  "  if (Array.isArray(products) && products.length) {",
+                  "    pm.collectionVariables.set('productId', String(products[0].id));",
+                  "    pm.collectionVariables.set('productId1', String(products[0].id));",
+                  "    if (products[1]) {",
+                  "      pm.collectionVariables.set('productId2', String(products[1].id));",
+                  "    }",
+                  "    console.log('Set productId / productId1 / productId2 from list');",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products",
+            "description": "`responseData` is an array of `{ id, name }`. Test script sets `productId`, `productId1`, `productId2`."
+          },
+          "response": []
+        },
+        {
+          "name": "List products (search)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products?search=Lux",
+            "description": "Optional query `search` — substring match on product `name` (wildcards stripped server-side)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const data = body && body.responseData;",
+                  "  if (data && data.id != null) {",
+                  "    pm.collectionVariables.set('productId', String(data.id));",
+                  "    pm.collectionVariables.set('productId1', String(data.id));",
+                  "    console.log('Set productId / productId1:', data.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lux Soap\"\n}"
+            },
+            "url": "{{baseUrl}}/products",
+            "description": "`name` required, trimmed, unique (`409` if duplicate). `responseData`: `{ id, name }`. Change `name` if duplicate."
+          },
+          "response": []
+        },
+        {
+          "name": "Create product (example — Cold Drink)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cold Drink\"\n}"
+            },
+            "url": "{{baseUrl}}/products",
+            "description": "Alternate example body `{ \"name\": \"Cold Drink\" }`. Change name if duplicate. Run **List products** to refresh `productId1` / `productId2`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get product by id",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "description": "Returns `data`: `{ id, name }`. `404` if not found. Set `productId` via **List products** or **Create product**."
+          },
+          "response": []
+        },
+        {
+          "name": "Update product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lux Soap (updated)\"\n}"
+            },
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "description": "Body must include `name` (trimmed, unique). `404` not found; `409` duplicate name."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "description": "Safe delete: `409` if linked to a campaign. Success: `responseData: null`, `message`: Product deleted successfully."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Prize config",
+      "description": "JWT required. Configure **prizes**, per-**campaign** product→prize **mappings**, **inventory**, and **distribution limits**. Run **Campaigns → Create campaign**, **Products** (and map products to campaign), **Create prize** / **List prizes** so `campaignId`, `productId1`, `prizeId` are valid before **Save prize config**.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "List prizes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const list = body && body.responseData;",
+                  "  if (Array.isArray(list) && list.length) {",
+                  "    pm.collectionVariables.set('prizeId', String(list[0].id));",
+                  "    if (list[1]) pm.collectionVariables.set('prizeId2', String(list[1].id));",
+                  "    console.log('Set prizeId / prizeId2 from list');",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/prizes",
+            "description": "`responseData`: `[{ id, name }, ...]`. Test script sets `prizeId` / `prizeId2` from first two rows (for **Probability** multi-prize examples)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create prize (example — Gold Spin Voucher)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd && rd.id != null) {",
+                  "    pm.collectionVariables.set('prizeId', String(rd.id));",
+                  "    console.log('Set prizeId:', rd.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Gold Spin Voucher\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/prizes",
+            "description": "`201`. Example body: `{ \"name\": \"Gold Spin Voucher\" }`. Test script saves `responseData.id` → `prizeId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create prize (example — Silver Keychain)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd && rd.id != null) {",
+                  "    pm.collectionVariables.set('prizeId2', String(rd.id));",
+                  "    console.log('Set prizeId2:', rd.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Silver Keychain\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/prizes",
+            "description": "Second example prize; change `name` if duplicate. Saves `responseData.id` → `prizeId2`. Run after **Create prize** (Gold) or use a unique name."
+          },
+          "response": []
+        },
+        {
+          "name": "Get prize config by campaign",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/prize-config/{{campaignId}}",
+            "description": "Example `responseData`: `{ campaignId, mappings: [{productId, prizeId}], inventory: [{prizeId, stock}], distributionLimits: { maxPerDay, maxPerUser, totalLimit } }`. Empty arrays / zero limits if never saved. `404` if campaign missing."
+          },
+          "response": []
+        },
+        {
+          "name": "Save prize config (example payload — static ids)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": 1,\n  \"mappings\": [\n    { \"productId\": 1, \"prizeId\": 1 }\n  ],\n  \"inventory\": [\n    { \"prizeId\": 1, \"stock\": 50 }\n  ],\n  \"distributionLimits\": {\n    \"maxPerDay\": 10,\n    \"maxPerUser\": 1,\n    \"totalLimit\": 100\n  }\n}"
+            },
+            "url": "{{baseUrl}}/admin/prize-config",
+            "description": "Full replace in one **transaction**. Edit ids: `productId` must be on `campaign_products` for `campaignId`; `prizeId` must exist in `prizes`; inventory prize ids must **match** mapping prize ids exactly; `maxPerUser` and `maxPerDay` ≤ `totalLimit`. `409` on unique violations."
+          },
+          "response": []
+        },
+        {
+          "name": "Save prize config (collection variables)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": {{campaignId}},\n  \"mappings\": [\n    { \"productId\": {{productId1}}, \"prizeId\": {{prizeId}} }\n  ],\n  \"inventory\": [\n    { \"prizeId\": {{prizeId}}, \"stock\": 50 }\n  ],\n  \"distributionLimits\": {\n    \"maxPerDay\": 10,\n    \"maxPerUser\": 1,\n    \"totalLimit\": 100\n  }\n}"
+            },
+            "url": "{{baseUrl}}/admin/prize-config",
+            "description": "Same contract as static example; uses `{{campaignId}}`, `{{productId1}}`, `{{prizeId}}`. Ensure campaign has product **mapped** via **Campaigns → Map products** before saving."
+          },
+          "response": []
+        },
+        {
+          "name": "Save prize config (clear mappings & inventory)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": {{campaignId}},\n  \"mappings\": [],\n  \"inventory\": [],\n  \"distributionLimits\": {\n    \"maxPerDay\": 0,\n    \"maxPerUser\": 0,\n    \"totalLimit\": 0\n  }\n}"
+            },
+            "url": "{{baseUrl}}/admin/prize-config",
+            "description": "Clears all mappings and inventory for the campaign; still upserts `prize_configs` (distribution limits only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Probability",
+      "description": "Weighted spin probabilities per **campaign**. Weights must **sum to 100**, exactly **one** `prizeId: null` (lose), at least one **winning** prize with weight > 0, integers only. `POST` replaces all rows in a **transaction**. Import **Prize** ids from **Admin — Prize config**.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Get probability config by campaign",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/probability-config/{{campaignId}}",
+            "description": "Example `responseData`: `{ campaignId, probabilities: [{ prizeId: 1, weight: 5 }, { prizeId: null, weight: 85 }] }`. `probabilities` is `[]` until first **Save probability config**. `404` if campaign missing."
+          },
+          "response": []
+        },
+        {
+          "name": "Save probability config (example payload)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": 1,\n  \"probabilities\": [\n    { \"prizeId\": 1, \"weight\": 5 },\n    { \"prizeId\": 2, \"weight\": 10 },\n    { \"prizeId\": null, \"weight\": 85 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/admin/probability-config",
+            "description": "Replace all probability rows for `campaignId`. Use real `prizeId` values from your DB. JSON `null` for lose row. Sum weights = 100."
+          },
+          "response": []
+        },
+        {
+          "name": "Save probability config (collection variables)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": {{campaignId}},\n  \"probabilities\": [\n    { \"prizeId\": {{prizeId}}, \"weight\": 15 },\n    { \"prizeId\": null, \"weight\": 85 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/admin/probability-config",
+            "description": "Two-outcome example: one prize + lose = 100. Set `campaignId` and `prizeId` (e.g. **Create prize**). For multiple prizes add rows; keep exactly one `prizeId: null`."
+          },
+          "response": []
+        },
+        {
+          "name": "Save probability config (two prizes + lose — variables)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": {{campaignId}},\n  \"probabilities\": [\n    { \"prizeId\": {{prizeId}}, \"weight\": 10 },\n    { \"prizeId\": {{prizeId2}}, \"weight\": 5 },\n    { \"prizeId\": null, \"weight\": 85 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/admin/probability-config",
+            "description": "Weights 10+5+85=100. Requires two distinct prizes: run **List prizes** or **Create prize** + **Create prize (Silver)**. `prizeId` ≠ `prizeId2` or duplicate validation fails."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — QR mappings",
+      "description": "CRUD for `qr_mappings`. **Create** accepts optional `code` (URL-safe alnum + `_-`); if omitted, server generates a random code. **`redirectUrl`** uses the saved **QR frontend base** (`GET/PUT /admin/qr-frontend-settings`), or `http://localhost:3000` until you configure it. **Delete** is a soft delete (`isActive: false`). **Patch** is rejected (`403`) when inactive or expired. Campaign must exist and be **ACTIVE**.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Get QR frontend base URL",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/qr-frontend-settings",
+            "description": "`responseData`: `{ frontendBaseUrl, effectiveFrontendBaseUrl }`. Saved value is `null` until **Save QR frontend base URL**; effective base defaults to `http://localhost:3000`."
+          },
+          "response": []
+        },
+        {
+          "name": "Save QR frontend base URL",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frontendBaseUrl\": \"http://localhost:5173\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/qr-frontend-settings",
+            "description": "Body **must** include `frontendBaseUrl` (http/https origin, no path) or **`null`** to clear. Persists to DB and **recomputes `redirectUrl` on every QR mapping**; `responseData.qrMappingsUpdated` is the row count."
+          },
+          "response": []
+        },
+        {
+          "name": "List QR mappings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const list = body && body.responseData;",
+                  "  if (Array.isArray(list) && list.length) {",
+                  "    const first = list[0];",
+                  "    if (first.id != null) pm.collectionVariables.set('qrMappingId', String(first.id));",
+                  "    if (first.code) pm.collectionVariables.set('qrCode', String(first.code));",
+                  "    console.log('Set qrMappingId / qrCode from first row');",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/qr-mappings",
+            "description": "`responseData`: array of `{ id, code, campaignId, campaignName, redirectUrl, isActive, expiresAt, createdAt }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create QR mapping (auto code)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd) {",
+                  "    if (rd.id != null) pm.collectionVariables.set('qrMappingId', String(rd.id));",
+                  "    if (rd.code) pm.collectionVariables.set('qrCode', String(rd.code));",
+                  "    console.log('Saved qrMappingId / qrCode');",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": {{campaignId}}\n}"
+            },
+            "url": "{{baseUrl}}/admin/qr-mappings",
+            "description": "Omit `code` → server generates unique URL-safe code. Optional `expiresAt` ISO string."
+          },
+          "response": []
+        },
+        {
+          "name": "Create QR mapping (custom code)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd) {",
+                  "    if (rd.id != null) pm.collectionVariables.set('qrMappingId', String(rd.id));",
+                  "    if (rd.code) pm.collectionVariables.set('qrCode', String(rd.code));",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"DEMO_QR_001\",\n  \"campaignId\": {{campaignId}}\n}"
+            },
+            "url": "{{baseUrl}}/admin/qr-mappings",
+            "description": "`409` if `code` duplicate. Pattern: `^[a-zA-Z0-9_-]+$`."
+          },
+          "response": []
+        },
+        {
+          "name": "Update QR mapping",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": {{campaignId}}\n}"
+            },
+            "url": "{{baseUrl}}/admin/qr-mappings/{{qrMappingId}}",
+            "description": "Optional: `campaignId`, `expiresAt` (null clears), `isActive`. `403` if row inactive/expired before update."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete QR mapping (soft)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/admin/qr-mappings/{{qrMappingId}}",
+            "description": "Sets `isActive: false`. `responseData`: `null`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Campaign landing (public)",
+      "description": "Resolve landing page campaign details from QR. QR must exist, be active, not expired, and mapped campaign must be active and within campaign date range.",
+      "item": [
+        {
+          "name": "Resolve campaign by QR",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/campaign?qr={{qrCode}}",
+            "description": "Public route used by landing page. Returns `{ campaignId, campaignName, branding, offer }` in `responseData`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Lead submission",
+      "description": "Public entry form. Submit lead details + receipt file in **multipart/form-data**. Required fields: `name`, `phone` (7-14 digits), `email`, `address`, `shopLocation`, `qrCode`, `receiptNumber`, `acceptTerms`, and `file` (jpeg/png/webp/pdf, max 5MB). `acceptTerms` must be `true`; `false` is rejected (`400`). Duplicate `receiptNumber` returns `409`.",
+      "item": [
+        {
+          "name": "Get gift items by QR campaign code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/leads/gifts?qrCode={{qrCode}}",
+            "description": "Public route. Returns all gift/prize items for the campaign mapped to this QR code, with current stock and `inStock` flag."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit lead with receipt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const rd = body && body.responseData;",
+                  "  if (rd && rd.participationId != null) {",
+                  "    pm.collectionVariables.set('participationId', String(rd.participationId));",
+                  "    console.log('Set participationId:', rd.participationId);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "John Doe", "type": "text" },
+                { "key": "phone", "value": "9876543210", "type": "text" },
+                { "key": "email", "value": "john@example.com", "type": "text" },
+                { "key": "address", "value": "221B Baker Street, London", "type": "text" },
+                { "key": "shopLocation", "value": "Bangalore - MG Road", "type": "text" },
+                { "key": "qrCode", "value": "{{qrCode}}", "type": "text" },
+                { "key": "receiptNumber", "value": "INV-2026-0001", "type": "text" },
+                { "key": "acceptTerms", "value": "true", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": "{{baseUrl}}/leads/submit",
+            "description": "Public route. `acceptTerms` accepts boolean-like values (`true`/`false`, `1`/`0`). Successful response includes `{ leadId, participationId, receiptId, fileUrl }` in `responseData`. Test script saves `participationId` for `/spin`."
+          },
+          "response": []
+        },
+        {
+          "name": "List leads (paginated)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/leads?page=1&limit=10&search=john&campaignId={{campaignId}}",
+            "description": "Authenticated route. Pagination params: `page` (>=1), `limit` (1-100), optional `search` (name/email/phone), optional `campaignId`. Returns `responseData.items` + `responseData.pagination`."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit lead (terms false — expected 400)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Jane Doe", "type": "text" },
+                { "key": "phone", "value": "9876543211", "type": "text" },
+                { "key": "email", "value": "jane@example.com", "type": "text" },
+                { "key": "address", "value": "10 Downing Street, London", "type": "text" },
+                { "key": "shopLocation", "value": "Mumbai - Andheri", "type": "text" },
+                { "key": "qrCode", "value": "{{qrCode}}", "type": "text" },
+                { "key": "receiptNumber", "value": "INV-2026-0002", "type": "text" },
+                { "key": "acceptTerms", "value": "false", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": "{{baseUrl}}/leads/submit",
+            "description": "Validation example: service rejects `acceptTerms=false` with `400` (`You must accept terms and conditions to continue`)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Receipt",
+      "description": "Authenticated receipt upload with duplicate detection by SHA-256 hash (and optional pHash similarity).",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Upload receipt",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "John Doe", "type": "text" },
+                { "key": "mobile", "value": "9876543210", "type": "text" },
+                { "key": "email", "value": "admin@example.com", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": "{{baseUrl}}/receipt/upload",
+            "description": "Example multipart payload for duplicate-check flow. Requires Bearer token. `email` should match authenticated user email."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Spin",
+      "description": "Public endpoint. This route uses `@SkipStandardResponse()` and returns raw spin payload on success. Use `participationId` from **Lead submission → Submit lead with receipt**.",
+      "item": [
+        {
+          "name": "Spin wheel",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participationId\": {{participationId}}\n}"
+            },
+            "url": "{{baseUrl}}/spin",
+            "description": "Example body requires `participationId` (integer >= 1). Run **Lead submission → Submit lead with receipt** first to auto-populate `{{participationId}}`."
+          },
+          "response": []
+        },
+        {
+          "name": "Spin wheel (static example payload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participationId\": 1\n}"
+            },
+            "url": "{{baseUrl}}/spin",
+            "description": "Static payload example for quick smoke testing when variable values are not configured."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Public — QR resolve",
+      "description": "**No Bearer token.** Returns **302 Found** with `Location` = stored `redirectUrl`. Postman may auto-follow redirects (disable in request settings to see **302** + headers). Rate-limited (throttler).",
+      "item": [
+        {
+          "name": "Resolve QR code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/qr/{{qrCode}}",
+            "description": "Run **List** or **Create** in **Admin — QR mappings** first so `{{qrCode}}` is set. Inactive/expired → `403` JSON envelope via exception filter."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
